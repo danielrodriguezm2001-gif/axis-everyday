@@ -1,0 +1,7 @@
+{
+  "_ayuda": "Copia a coaches.json. 'alias' = como aparece el nombre en AimHarder (coachName) y en 'Profesional referente' del Excel. 'telegram_chat_id' = chat del coach con el bot (ver README).",
+  "coaches": [
+    {"nombre": "Marc", "alias": ["marc"], "telegram_chat_id": "123456789"},
+    {"nombre": "Ana Maria", "alias": ["ana maria"], "telegram_chat_id": "987654321"}
+  ]
+}

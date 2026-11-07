@@ -1,0 +1,6 @@
+everyday-work.json
+coaches.json
+__pycache__/
+*.xlsx
+secrets.env
+*.bat

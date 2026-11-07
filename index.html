@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Everyday Work · Axis</title>
+<link rel="icon" href="assets/simbolo-verde.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
+<style>
+  /* Brand book Axis: verde #2f6f6d, blanco roto #f4f5ef, negro; sin sombras, esquinas casi rectas. */
+  :root { --bg:#f4f5ef; --card:#fff; --ink:#000; --muted:#5c5d59; --acc:#2f6f6d; --accsoft:#e3eeec; --line:#dcdcd6; --warn:#8a5a00;
+          --display:Poppins,Garet,"Helvetica Neue",Arial,sans-serif; --sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 var(--sans); }
+  header { padding:14px 16px 10px; position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--line); z-index:2; }
+  .top { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
+  .logo { height:34px; display:block; }
+  h1 { font:600 18px var(--display); margin:0 auto 0 0; color:var(--ink); padding-left:14px; border-left:2px solid var(--acc); }
+  select, button { font:inherit; padding:7px 10px; border:1px solid #7a7b76; border-radius:8px; background:var(--card); color:var(--ink); }
+  .strip { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; scrollbar-width:thin; }
+  .strip + .strip { margin-top:8px; }
+  .chip { flex:none; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:7px 16px; text-align:center; cursor:pointer; line-height:1.2; }
+  .chip small { display:block; color:var(--muted); font-size:12px; }
+  .chip.on { background:var(--acc); border-color:var(--acc); color:#fff; }
+  .chip.on small { color:#ffffffcc; }
+  .chip.vacio { opacity:.45; }
+  .chip.hora { font:600 17px var(--display); }
+  .chip:focus-visible, select:focus-visible, button:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  main { padding:16px; max-width:1200px; margin:auto; }
+  .meta { color:var(--muted); margin:2px 0 14px; }
+  .meta b { color:var(--ink); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; }
+  .per { background:var(--card); border:1px solid var(--line); border-top:3px solid var(--acc); border-radius:2px; padding:16px; }
+  body { font-size:clamp(16px, 1.3vw, 24px); }
+  .per h2 { margin:0 0 12px; font:600 1.25em var(--display); }
+  .per ol { margin:0 0 12px; padding:0; list-style:none; counter-reset:n; }
+  .per li { counter-increment:n; display:flex; gap:10px; padding:8px 10px; margin-bottom:6px; background:var(--accsoft); border-radius:2px; font-size:1em; font-weight:600; }
+  .per li::before { content:counter(n); flex:none; width:22px; height:22px; border-radius:50%; background:var(--acc); color:#fff; font-size:13px; display:grid; place-items:center; margin-top:1px; }
+  .dato { font-size:14px; color:var(--muted); margin-top:6px; }
+  .dato b { color:var(--ink); font-weight:600; }
+  .les { color:var(--warn); }
+  .sin { color:var(--warn); }
+  .vacia { color:var(--muted); font-style:italic; }
+  .ses + .ses { margin-top:30px; }
+  #msg, .nada { color:var(--muted); padding:40px 0; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <img class="logo" src="assets/logotipo-verde.png" alt="Axis Health &amp; Performance">
+    <h1>Everyday Work</h1>
+    <span id="upd" style="color:var(--muted);font-size:13px"></span>
+    <select id="coach" aria-label="Coach"><option value="">Todos los coaches</option></select>
+    <button id="cfg" title="Cambiar Gist">⚙</button>
+  </div>
+  <div class="strip" id="dias"></div>
+  <div class="strip" id="horas"></div>
+</header>
+<main><div id="msg">Cargando…</div><div id="out"></div></main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const qs = new URLSearchParams(location.search);
+let data, dia, hora;
+
+const fechaCorta = iso => new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
+const fechaLarga = iso => new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+const inicio = h => (h || "").split(" ")[0];
+
+const local = ["localhost", "127.0.0.1"].includes(location.hostname);
+let gistId = "";
+
+// Devuelve los datos actuales (archivo local o Gist) o null si no se pueden leer.
+async function traer() {
+  try {
+    if (local) {
+      const r = await fetch("everyday-work.json", { cache: "no-store" });
+      if (r.ok) return await r.json();
+    }
+    if (!gistId) return null;
+    const f = (await (await fetch("https://api.github.com/gists/" + gistId)).json()).files["everyday-work.json"];
+    return JSON.parse(f.truncated ? await (await fetch(f.raw_url)).text() : f.content);
+  } catch { return null; }
+}
+
+async function cargar() {
+  let g = qs.get("gist") || lsGet("everyday_gist");
+  if (!g && !local) { g = prompt("Pega la URL del Gist (https://api.github.com/gists/…) o su ID:"); if (!g) return; }
+  gistId = (g || "").split("/").pop();
+  if (gistId) lsSet("everyday_gist", gistId);
+  data = await traer();
+  if (!data) { $("#msg").textContent = "No se pudo cargar everyday-work.json (¿has ejecutado build_everyday.py?)."; return; }
+  iniciar();
+  setInterval(refrescar, 60000);
+}
+
+// Cada minuto vuelve a leer los datos; si hay una sincronización nueva, repinta sin mover la selección.
+async function refrescar() {
+  const nuevo = await traer();
+  if (!nuevo || nuevo.generado === data.generado) return;
+  data = nuevo;
+  pintar();
+  marcar();
+}
+function marcar() {
+  const t = new Date(data.generado);
+  $("#upd").textContent = "Actualizado " + t.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+}
+
+function iniciar() {
+  $("#msg").remove();
+  const coaches = [...new Set(Object.values(data.dias).flat().map(s => s.coach).filter(Boolean))].sort();
+  $("#coach").innerHTML += coaches.map(c => `<option>${esc(c)}</option>`).join("");
+  $("#coach").value = qs.get("coach") || lsGet("everyday_coach") || "";
+  const dias = Object.keys(data.dias);
+  const hoy = new Date().toISOString().slice(0, 10);
+  dia = qs.get("dia") || dias.find(d => d >= hoy && sesDe(d).length) || dias[0];
+  hora = qs.get("hora");
+  pintar();
+  marcar();
+}
+
+const sesDe = d => (data.dias[d] || []).filter(s => !$("#coach").value || s.coach === $("#coach").value);
+const personasDe = d => sesDe(d).reduce((n, s) => n + s.personas.length, 0);
+
+function pintar() {
+  lsSet("everyday_coach", $("#coach").value);
+  // días
+  $("#dias").innerHTML = Object.keys(data.dias).map(d =>
+    `<button class="chip ${d === dia ? "on" : ""} ${personasDe(d) ? "" : "vacio"}" data-d="${d}">${esc(fechaCorta(d))}<small>${personasDe(d)} pers.</small></button>`).join("");
+  // horas del día
+  const ses = sesDe(dia);
+  const horas = [...new Set(ses.map(s => inicio(s.hora)))].sort();
+  if (!horas.includes(hora)) hora = horas.find(h => ses.some(s => inicio(s.hora) === h && s.personas.length)) || horas[0];
+  $("#horas").innerHTML = horas.map(h => {
+    const n = ses.filter(s => inicio(s.hora) === h).reduce((a, s) => a + s.personas.length, 0);
+    return `<button class="chip hora ${h === hora ? "on" : ""} ${n ? "" : "vacio"}" data-h="${h}">${esc(h)}<small>${n} pers.</small></button>`;
+  }).join("");
+  $("#dias .on")?.scrollIntoView({ inline: "center", block: "nearest" });
+  // sesión(es) de esa hora
+  const sel = ses.filter(s => inicio(s.hora) === hora);
+  if (!sel.length) { $("#out").innerHTML = '<div class="nada">No hay sesiones este día.</div>'; return; }
+  $("#out").innerHTML = sel.map(s => `
+    <section class="ses">
+      <div class="meta"><b>${esc(fechaLarga(dia))} · ${esc(s.hora)}</b> — ${esc(s.clase)} · ${esc(s.coach)} · ${s.personas.length} persona(s)</div>
+      ${s.personas.length ? `<div class="grid">${s.personas.map(tarjeta).join("")}</div>` : '<div class="nada">Sin reservas en esta sesión.</div>'}
+    </section>`).join("");
+}
+
+function tarjeta(p) {
+  const f = p.ficha;
+  if (!f) return `<article class="per"><h2>${esc(p.aim)}</h2><div class="sin">Sin ficha en el Excel</div></article>`;
+  return `<article class="per"><h2>${esc(f.nombre)}</h2>` +
+    (f.everyday.length ? `<ol>${f.everyday.map(e => `<li>${esc(e)}</li>`).join("")}</ol>` : '<div class="vacia">Sin Every day work</div>') +
+    `</article>`;
+}
+
+$("#dias").onclick = e => { const b = e.target.closest("[data-d]"); if (b) { dia = b.dataset.d; hora = null; pintar(); } };
+$("#horas").onclick = e => { const b = e.target.closest("[data-h]"); if (b) { hora = b.dataset.h; pintar(); } };
+$("#coach").onchange = () => pintar();
+$("#cfg").onclick = () => { lsSet("everyday_gist", ""); location.reload(); };
+cargar();
+</script>
+</body>
+</html>

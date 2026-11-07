@@ -1,0 +1,30 @@
+name: Everyday Work
+on:
+  schedule:
+    - cron: "*/10 5-22 * * *"   # cada 10 min, ~06:00-23:00 hora de Madrid (UTC)
+  workflow_dispatch:
+concurrency:
+  group: everyday
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python build_everyday.py --live --dias 14
+        env:
+          AIMHARDER_EMAIL: ${{ secrets.AIMHARDER_EMAIL }}
+          AIMHARDER_PASSWORD: ${{ secrets.AIMHARDER_PASSWORD }}
+          AIMHARDER_SUBDOMAIN: ${{ secrets.AIMHARDER_SUBDOMAIN }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          SHEET_URL: ${{ secrets.SHEET_URL }}
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          SHEET_FILE_ID: ${{ secrets.SHEET_FILE_ID }}
