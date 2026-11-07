@@ -10,6 +10,9 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: write   # para el paso final que mantiene activa la tarea programada
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,3 +31,10 @@ jobs:
           SHEET_URL: ${{ secrets.SHEET_URL }}
           GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
           SHEET_FILE_ID: ${{ secrets.SHEET_FILE_ID }}
+      # GitHub desactiva las tareas programadas tras 60 dias sin actividad en el repositorio.
+      # Volver a "activar" el workflow en cada ejecucion reinicia ese plazo.
+      - name: Mantener activa la tarea programada
+        if: always()
+        run: gh workflow enable everyday.yml --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}

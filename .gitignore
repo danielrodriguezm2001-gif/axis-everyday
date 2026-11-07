@@ -4,3 +4,4 @@ __pycache__/
 *.xlsx
 secrets.env
 *.bat
+poner-secretos.ps1
